@@ -8,6 +8,7 @@
 
 export * from './adminCredentials';
 export * from './adminSession';
+export * from './errorEnvelope';
 export * from './healthStatus';
 export * from './order';
 export * from './orderInput';
@@ -20,3 +21,5 @@ export * from './painting';
 export * from './paintingInput';
 export * from './paintingSize';
 export * from './paintingUpdate';
+export * from './uploadUrlRequest';
+export * from './uploadUrlResponse';

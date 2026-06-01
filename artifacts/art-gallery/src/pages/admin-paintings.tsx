@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
 import { useListPaintings, useCreatePainting, useUpdatePainting, useDeletePainting, getListPaintingsQueryKey } from "@workspace/api-client-react";
+import { useUpload } from "@workspace/object-storage-web";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2, Plus, Pencil, Trash2, X, ImagePlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,20 +32,30 @@ const paintingSchema = z.object({
   sizes: z.array(sizeSchema).min(1, "يجب إضافة مقاس واحد على الأقل")
 });
 
-const ADMIN_TOKEN_KEY = "admin_token";
-
 export default function AdminPaintings() {
   const { data: paintings, isLoading } = useListPaintings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const createPainting = useCreatePainting();
   const updatePainting = useUpdatePainting();
   const deletePainting = useDeletePainting();
   const queryClient = useQueryClient();
+
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      const imageUrl = `/api/storage${response.objectPath}`;
+      form.setValue("imageUrl", imageUrl, { shouldValidate: true });
+      toast.success("تم رفع الصورة بنجاح");
+    },
+    onError: () => {
+      toast.error("حدث خطأ أثناء رفع الصورة");
+      setImagePreview(null);
+      form.setValue("imageUrl", "");
+    },
+  });
 
   const formatter = new Intl.NumberFormat('ar-IQ', { style: 'currency', currency: 'IQD', maximumFractionDigits: 0 });
 
@@ -70,34 +80,8 @@ export default function AdminPaintings() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const preview = URL.createObjectURL(file);
-    setImagePreview(preview);
-    setUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("فشل رفع الصورة");
-
-      const { imageUrl } = await res.json();
-      form.setValue("imageUrl", imageUrl, { shouldValidate: true });
-      toast.success("تم رفع الصورة بنجاح");
-    } catch {
-      toast.error("حدث خطأ أثناء رفع الصورة");
-      setImagePreview(null);
-      form.setValue("imageUrl", "");
-    } finally {
-      setUploading(false);
-    }
+    setImagePreview(URL.createObjectURL(file));
+    await uploadFile(file);
   };
 
   const handleOpenNew = () => {
@@ -132,7 +116,6 @@ export default function AdminPaintings() {
 
   const handleDelete = (id: number) => {
     if (!confirm("هل أنت متأكد من حذف هذه اللوحة؟")) return;
-
     deletePainting.mutate({ id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListPaintingsQueryKey() });
@@ -195,7 +178,6 @@ export default function AdminPaintings() {
             <div className="p-4 flex-1 flex flex-col">
               <h3 className="font-bold text-lg line-clamp-1 mb-1">{painting.title}</h3>
               <p className="text-primary font-bold mb-4" dir="ltr">{formatter.format(painting.price)}</p>
-
               <div className="mt-auto flex gap-2 pt-4 border-t">
                 <Button variant="outline" className="flex-1 gap-2" onClick={() => handleEdit(painting)}>
                   <Pencil className="w-4 h-4" />
@@ -230,23 +212,18 @@ export default function AdminPaintings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>العنوان</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="price"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>السعر (دينار عراقي)</FormLabel>
-                      <FormControl>
-                        <Input type="number" dir="ltr" className="text-right" {...field} />
-                      </FormControl>
+                      <FormControl><Input type="number" dir="ltr" className="text-right" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -273,18 +250,12 @@ export default function AdminPaintings() {
                           variant="outline"
                           className="w-full h-12 gap-2 text-base"
                           onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
+                          disabled={isUploading}
                         >
-                          {uploading ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              جاري رفع الصورة...
-                            </>
+                          {isUploading ? (
+                            <><Loader2 className="w-5 h-5 animate-spin" /> جاري رفع الصورة...</>
                           ) : (
-                            <>
-                              <ImagePlus className="w-5 h-5" />
-                              {imagePreview ? "تغيير الصورة" : "اختر صورة من الجهاز"}
-                            </>
+                            <><ImagePlus className="w-5 h-5" /> {imagePreview ? "تغيير الصورة" : "اختر صورة من الجهاز"}</>
                           )}
                         </Button>
                         {imagePreview && (
@@ -305,9 +276,7 @@ export default function AdminPaintings() {
                         )}
                       </div>
                     </FormControl>
-                    {fieldState.error && (
-                      <p className="text-destructive text-sm">{fieldState.error.message}</p>
-                    )}
+                    {fieldState.error && <p className="text-destructive text-sm">{fieldState.error.message}</p>}
                   </FormItem>
                 )}
               />
@@ -318,9 +287,7 @@ export default function AdminPaintings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>الوصف (اختياري)</FormLabel>
-                    <FormControl>
-                      <Textarea className="resize-none" rows={4} {...field} />
-                    </FormControl>
+                    <FormControl><Textarea className="resize-none" rows={4} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -333,39 +300,26 @@ export default function AdminPaintings() {
                     <Plus className="w-4 h-4 ml-2" /> إضافة مقاس
                   </Button>
                 </div>
-
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-3 items-end">
-                    <FormField
-                      control={form.control}
-                      name={`sizes.${index}.name`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormLabel className="text-xs">الاسم (مثال: كبير)</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`sizes.${index}.width`}
-                      render={({ field }) => (
-                        <FormItem className="w-20">
-                          <FormLabel className="text-xs">العرض</FormLabel>
-                          <FormControl><Input type="number" dir="ltr" {...field} /></FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`sizes.${index}.height`}
-                      render={({ field }) => (
-                        <FormItem className="w-20">
-                          <FormLabel className="text-xs">الطول</FormLabel>
-                          <FormControl><Input type="number" dir="ltr" {...field} /></FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={form.control} name={`sizes.${index}.name`} render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormLabel className="text-xs">الاسم (مثال: كبير)</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name={`sizes.${index}.width`} render={({ field }) => (
+                      <FormItem className="w-20">
+                        <FormLabel className="text-xs">العرض</FormLabel>
+                        <FormControl><Input type="number" dir="ltr" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name={`sizes.${index}.height`} render={({ field }) => (
+                      <FormItem className="w-20">
+                        <FormLabel className="text-xs">الطول</FormLabel>
+                        <FormControl><Input type="number" dir="ltr" {...field} /></FormControl>
+                      </FormItem>
+                    )} />
                     {fields.length > 1 && (
                       <Button type="button" variant="outline" size="icon" className="mb-0.5 shrink-0 text-destructive" onClick={() => remove(index)}>
                         <X className="w-4 h-4" />
@@ -376,40 +330,23 @@ export default function AdminPaintings() {
               </div>
 
               <div className="flex gap-8 border-t pt-4">
-                <FormField
-                  control={form.control}
-                  name="inStock"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4 w-full">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">متوفر في المخزن</FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="featured"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4 w-full">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">لوحة مميزة</FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="inStock" render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4 w-full">
+                    <FormLabel className="text-base">متوفر في المخزن</FormLabel>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="featured" render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4 w-full">
+                    <FormLabel className="text-base">لوحة مميزة</FormLabel>
+                    <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                  </FormItem>
+                )} />
               </div>
 
               <div className="flex justify-end gap-3 pt-6 border-t">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
-                <Button type="submit" disabled={uploading || createPainting.isPending || updatePainting.isPending}>
+                <Button type="submit" disabled={isUploading || createPainting.isPending || updatePainting.isPending}>
                   {(createPainting.isPending || updatePainting.isPending) && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
                   {editingId ? "تحديث اللوحة" : "إضافة اللوحة"}
                 </Button>
