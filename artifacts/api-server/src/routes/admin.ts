@@ -56,8 +56,7 @@ router.post("/admin/upload", (req, res) => {
   upload.single("image")(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const host = `${req.protocol}://${req.get("host")}`;
-    const imageUrl = `${host}/uploads/${req.file.filename}`;
+    const imageUrl = `/uploads/${req.file.filename}`;
     res.json({ imageUrl });
   });
 });
