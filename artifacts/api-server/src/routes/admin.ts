@@ -2,7 +2,29 @@ import { Router } from "express";
 import { db, adminsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
 import { AdminLoginBody } from "@workspace/api-zod";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, "../../uploads"),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${crypto.randomBytes(6).toString("hex")}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only images are allowed"));
+  },
+});
 
 const router = Router();
 
@@ -24,6 +46,21 @@ function getSession(req: { cookies?: Record<string, string>; headers: Record<str
   }
   return null;
 }
+
+router.post("/admin/upload", (req, res) => {
+  const token = getSession(req as Parameters<typeof getSession>[0]);
+  if (!token) return res.status(401).json({ error: "Not authenticated" });
+  const session = sessions.get(token);
+  if (!session || session.expiresAt < Date.now()) return res.status(401).json({ error: "Session expired" });
+
+  upload.single("image")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const host = `${req.protocol}://${req.get("host")}`;
+    const imageUrl = `${host}/uploads/${req.file.filename}`;
+    res.json({ imageUrl });
+  });
+});
 
 router.post("/admin/login", async (req, res) => {
   const parsed = AdminLoginBody.safeParse(req.body);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useListPaintings, useCreatePainting, useUpdatePainting, useDeletePainting, getListPaintingsQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Plus, Pencil, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, X, ImagePlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -26,17 +26,22 @@ const paintingSchema = z.object({
   title: z.string().min(2, "العنوان مطلوب"),
   description: z.string().optional(),
   price: z.coerce.number().min(1, "السعر مطلوب"),
-  imageUrl: z.string().url("رابط الصورة غير صالح"),
+  imageUrl: z.string().min(1, "الصورة مطلوبة"),
   inStock: z.boolean().default(true),
   featured: z.boolean().default(false),
   sizes: z.array(sizeSchema).min(1, "يجب إضافة مقاس واحد على الأقل")
 });
 
+const ADMIN_TOKEN_KEY = "admin_token";
+
 export default function AdminPaintings() {
   const { data: paintings, isLoading } = useListPaintings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const createPainting = useCreatePainting();
   const updatePainting = useUpdatePainting();
   const deletePainting = useDeletePainting();
@@ -62,6 +67,39 @@ export default function AdminPaintings() {
     name: "sizes"
   });
 
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("فشل رفع الصورة");
+
+      const { imageUrl } = await res.json();
+      form.setValue("imageUrl", imageUrl, { shouldValidate: true });
+      toast.success("تم رفع الصورة بنجاح");
+    } catch {
+      toast.error("حدث خطأ أثناء رفع الصورة");
+      setImagePreview(null);
+      form.setValue("imageUrl", "");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleOpenNew = () => {
     form.reset({
       title: "",
@@ -72,6 +110,7 @@ export default function AdminPaintings() {
       featured: false,
       sizes: [{ name: "Standard", width: 50, height: 70, unit: "cm" }]
     });
+    setImagePreview(null);
     setEditingId(null);
     setIsDialogOpen(true);
   };
@@ -86,19 +125,20 @@ export default function AdminPaintings() {
       featured: painting.featured,
       sizes: painting.sizes
     });
+    setImagePreview(painting.imageUrl);
     setEditingId(painting.id);
     setIsDialogOpen(true);
   };
 
   const handleDelete = (id: number) => {
     if (!confirm("هل أنت متأكد من حذف هذه اللوحة؟")) return;
-    
+
     deletePainting.mutate({ id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListPaintingsQueryKey() });
         toast.success("تم حذف اللوحة بنجاح");
       },
-      onError: () => toast.error("حدث خطأ أثناء החذف")
+      onError: () => toast.error("حدث خطأ أثناء الحذف")
     });
   };
 
@@ -155,7 +195,7 @@ export default function AdminPaintings() {
             <div className="p-4 flex-1 flex flex-col">
               <h3 className="font-bold text-lg line-clamp-1 mb-1">{painting.title}</h3>
               <p className="text-primary font-bold mb-4" dir="ltr">{formatter.format(painting.price)}</p>
-              
+
               <div className="mt-auto flex gap-2 pt-4 border-t">
                 <Button variant="outline" className="flex-1 gap-2" onClick={() => handleEdit(painting)}>
                   <Pencil className="w-4 h-4" />
@@ -197,7 +237,7 @@ export default function AdminPaintings() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="price"
@@ -216,13 +256,58 @@ export default function AdminPaintings() {
               <FormField
                 control={form.control}
                 name="imageUrl"
-                render={({ field }) => (
+                render={({ fieldState }) => (
                   <FormItem>
-                    <FormLabel>رابط الصورة</FormLabel>
+                    <FormLabel>صورة اللوحة</FormLabel>
                     <FormControl>
-                      <Input dir="ltr" className="text-right" placeholder="https://..." {...field} />
+                      <div className="space-y-3">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageChange}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full h-12 gap-2 text-base"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              جاري رفع الصورة...
+                            </>
+                          ) : (
+                            <>
+                              <ImagePlus className="w-5 h-5" />
+                              {imagePreview ? "تغيير الصورة" : "اختر صورة من الجهاز"}
+                            </>
+                          )}
+                        </Button>
+                        {imagePreview && (
+                          <div className="relative rounded-lg overflow-hidden border aspect-video">
+                            <img src={imagePreview} alt="معاينة" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImagePreview(null);
+                                form.setValue("imageUrl", "");
+                                if (fileInputRef.current) fileInputRef.current.value = "";
+                              }}
+                              className="absolute top-2 left-2 bg-black/60 text-white rounded-full p-1 hover:bg-black/80"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
-                    <FormMessage />
+                    {fieldState.error && (
+                      <p className="text-destructive text-sm">{fieldState.error.message}</p>
+                    )}
                   </FormItem>
                 )}
               />
@@ -248,7 +333,7 @@ export default function AdminPaintings() {
                     <Plus className="w-4 h-4 ml-2" /> إضافة مقاس
                   </Button>
                 </div>
-                
+
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex gap-3 items-end">
                     <FormField
@@ -324,7 +409,7 @@ export default function AdminPaintings() {
 
               <div className="flex justify-end gap-3 pt-6 border-t">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
-                <Button type="submit" disabled={createPainting.isPending || updatePainting.isPending}>
+                <Button type="submit" disabled={uploading || createPainting.isPending || updatePainting.isPending}>
                   {(createPainting.isPending || updatePainting.isPending) && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
                   {editingId ? "تحديث اللوحة" : "إضافة اللوحة"}
                 </Button>
