@@ -22,7 +22,7 @@ export default function Home() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-primary mb-4">معرض اللوحات الفنية</h1>
+        <h1 className="text-5xl md:text-6xl font-bold text-primary mb-4 tracking-widest" style={{ fontFamily: "'Tajawal', sans-serif", letterSpacing: "0.2em" }}>inanna</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           اكتشف مجموعة فريدة من اللوحات الفنية الأصلية، مرسومة بأيدي فنانين مبدعين لتضيف لمسة من الجمال والأصالة إلى مساحتك.
         </p>
