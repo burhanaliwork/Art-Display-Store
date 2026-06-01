@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Art Gallery Store API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: paintings
+    description: Painting management
+  - name: orders
+    description: Order management
+  - name: admin
+    description: Admin authentication
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +28,245 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /paintings:
+    get:
+      operationId: listPaintings
+      tags: [paintings]
+      summary: List all paintings
+      responses:
+        "200":
+          description: List of paintings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Painting"
+    post:
+      operationId: createPainting
+      tags: [paintings]
+      summary: Create a new painting (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaintingInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Painting"
+
+  /paintings/featured:
+    get:
+      operationId: getFeaturedPaintings
+      tags: [paintings]
+      summary: Get featured paintings
+      responses:
+        "200":
+          description: Featured paintings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Painting"
+
+  /paintings/{id}:
+    get:
+      operationId: getPainting
+      tags: [paintings]
+      summary: Get a single painting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Painting found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Painting"
+        "404":
+          description: Not found
+    patch:
+      operationId: updatePainting
+      tags: [paintings]
+      summary: Update a painting (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaintingUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Painting"
+    delete:
+      operationId: deletePainting
+      tags: [paintings]
+      summary: Delete a painting (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List all orders (admin)
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Place a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/stats:
+    get:
+      operationId: getOrderStats
+      tags: [orders]
+      summary: Get order statistics (admin)
+      responses:
+        "200":
+          description: Order statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStats"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get a single order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}/status:
+    patch:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update order status (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCredentials"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+        "401":
+          description: Invalid credentials
+
+  /admin/me:
+    get:
+      operationId: getAdminMe
+      tags: [admin]
+      summary: Get current admin session
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+        "401":
+          description: Not authenticated
+
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      tags: [admin]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +277,182 @@ components:
       required:
         - status
 
+    PaintingSize:
+      type: object
+      required: [name, width, height, unit]
+      properties:
+        name:
+          type: string
+        width:
+          type: number
+        height:
+          type: number
+        unit:
+          type: string
+
+    Painting:
+      type: object
+      required: [id, title, price, imageUrl, sizes, inStock, featured, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        price:
+          type: number
+        imageUrl:
+          type: string
+        sizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaintingSize"
+        inStock:
+          type: boolean
+        featured:
+          type: boolean
+        createdAt:
+          type: string
+
+    PaintingInput:
+      type: object
+      required: [title, price, imageUrl, sizes]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageUrl:
+          type: string
+        sizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaintingSize"
+        inStock:
+          type: boolean
+        featured:
+          type: boolean
+
+    PaintingUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        imageUrl:
+          type: string
+        sizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaintingSize"
+        inStock:
+          type: boolean
+        featured:
+          type: boolean
+
+    OrderItem:
+      type: object
+      required: [paintingId, paintingTitle, size, price]
+      properties:
+        paintingId:
+          type: integer
+        paintingTitle:
+          type: string
+        size:
+          type: string
+        price:
+          type: number
+
+    Order:
+      type: object
+      required: [id, customerName, phone, address, items, totalPrice, status, createdAt]
+      properties:
+        id:
+          type: integer
+        customerName:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        notes:
+          type: ["string", "null"]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        totalPrice:
+          type: number
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+        createdAt:
+          type: string
+
+    OrderInput:
+      type: object
+      required: [customerName, phone, address, items]
+      properties:
+        customerName:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+
+    OrderStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+
+    OrderStats:
+      type: object
+      required: [total, pending, confirmed, shipped, delivered, cancelled, totalRevenue]
+      properties:
+        total:
+          type: integer
+        pending:
+          type: integer
+        confirmed:
+          type: integer
+        shipped:
+          type: integer
+        delivered:
+          type: integer
+        cancelled:
+          type: integer
+        totalRevenue:
+          type: number
+
+    AdminCredentials:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AdminSession:
+      type: object
+      required: [username, loggedIn]
+      properties:
+        username:
+          type: string
+        loggedIn:
+          type: boolean
