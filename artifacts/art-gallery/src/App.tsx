@@ -6,6 +6,14 @@ import { CartProvider } from "@/lib/cart";
 import { Layout } from "@/components/layout";
 import { AdminLayout } from "@/components/admin-layout";
 import NotFound from "@/pages/not-found";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { ADMIN_TOKEN_KEY } from "@/pages/admin";
+
+// Restore admin token on app startup
+const savedToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+if (savedToken) {
+  setAuthTokenGetter(() => localStorage.getItem(ADMIN_TOKEN_KEY));
+}
 
 import Home from "@/pages/home";
 import Cart from "@/pages/cart";

@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { useGetAdminMe, useAdminLogout, getGetAdminMeQueryKey } from "@workspace/api-client-react";
+import { useGetAdminMe, useAdminLogout, getGetAdminMeQueryKey, setAuthTokenGetter } from "@workspace/api-client-react";
 import { LayoutDashboard, Image as ImageIcon, LogOut, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { ADMIN_TOKEN_KEY } from "@/pages/admin";
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -19,6 +20,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
+        localStorage.removeItem(ADMIN_TOKEN_KEY);
+        setAuthTokenGetter(null);
         queryClient.invalidateQueries({ queryKey: getGetAdminMeQueryKey() });
         setLocation("/admin");
       }

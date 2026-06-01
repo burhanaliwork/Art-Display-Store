@@ -269,7 +269,8 @@ export const AdminLoginBody = zod.object({
 
 export const AdminLoginResponse = zod.object({
   "username": zod.string(),
-  "loggedIn": zod.boolean()
+  "loggedIn": zod.boolean(),
+  "token": zod.string().optional()
 })
 
 
@@ -278,7 +279,8 @@ export const AdminLoginResponse = zod.object({
  */
 export const GetAdminMeResponse = zod.object({
   "username": zod.string(),
-  "loggedIn": zod.boolean()
+  "loggedIn": zod.boolean(),
+  "token": zod.string().optional()
 })
 
 

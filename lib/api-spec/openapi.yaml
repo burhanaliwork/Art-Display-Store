@@ -456,3 +456,5 @@ components:
           type: string
         loggedIn:
           type: boolean
+        token:
+          type: string

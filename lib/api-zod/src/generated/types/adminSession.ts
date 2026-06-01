@@ -9,4 +9,5 @@
 export interface AdminSession {
   username: string;
   loggedIn: boolean;
+  token?: string;
 }

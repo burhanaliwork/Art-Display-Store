@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useAdminLogin, useGetAdminMe, getGetAdminMeQueryKey } from "@workspace/api-client-react";
+import { useAdminLogin, useGetAdminMe, getGetAdminMeQueryKey, setAuthTokenGetter } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+
+export const ADMIN_TOKEN_KEY = "admin_token";
 
 const loginSchema = z.object({
   username: z.string().min(1, "اسم المستخدم مطلوب"),
@@ -39,7 +41,9 @@ export default function AdminLogin() {
 
   const onSubmit = (data: z.infer<typeof loginSchema>) => {
     login.mutate({ data }, {
-      onSuccess: () => {
+      onSuccess: (session) => {
+        localStorage.setItem(ADMIN_TOKEN_KEY, session.token);
+        setAuthTokenGetter(() => localStorage.getItem(ADMIN_TOKEN_KEY));
         queryClient.invalidateQueries({ queryKey: getGetAdminMeQueryKey() });
         toast.success("تم تسجيل الدخول بنجاح");
         setLocation("/admin/dashboard");
