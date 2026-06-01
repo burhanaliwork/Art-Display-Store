@@ -1,9 +1,9 @@
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAdminLogin, useGetAdminMe, getGetAdminMeQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -21,7 +21,7 @@ export default function AdminLogin() {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const login = useAdminLogin();
-  const { data: admin, isLoading } = useGetAdminMe();
+  const { data: admin, isLoading } = useGetAdminMe({ query: { retry: false } });
 
   useEffect(() => {
     if (!isLoading && admin?.loggedIn) {
@@ -61,6 +61,14 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md bg-card border rounded-xl shadow-lg p-8">
+        <div className="mb-6">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+              <ArrowRight className="h-4 w-4" />
+              <span>الرجوع للمتجر</span>
+            </Button>
+          </Link>
+        </div>
         <div className="text-center mb-8">
           <h1 className="text-3xl font-serif font-bold text-primary mb-2">لوحة التحكم</h1>
           <p className="text-muted-foreground">تسجيل الدخول للمشرفين</p>
